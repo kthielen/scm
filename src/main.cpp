@@ -52,7 +52,9 @@ void run_local_repl(const StringSeq& sargs, bool interact, const std::string& in
         std::istringstream ss(inc_str);
         ReplEnv env(sargs);
 
-        while (ss) Eval(ReadSExpression(ss, env.allocator), env.root);
+        while (ss) {
+			Eval(ReadSExpression(ss, env.allocator), env.root);
+		}
 
         if (interact) {
             std::cout << "Scheme console:"                   << std::endl
