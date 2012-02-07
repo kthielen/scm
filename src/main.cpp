@@ -47,6 +47,19 @@ private:
     }
 };
 
+/*
+void run_local_repl(const StringSeq& sargs, bool interact, const std::string& inc_str) {
+	while (true) {
+		try {
+			Allocator a;
+			std::cout << PrintExpression(ReadSExpression(std::cin, a)) << std::endl;
+		} catch (std::exception& e) {
+			std::cout << "*\n** " << e.what() << "\n*" << std::endl;
+		}
+	}
+}
+*/
+
 void run_local_repl(const StringSeq& sargs, bool interact, const std::string& inc_str) {
     try {
         std::istringstream ss(inc_str);

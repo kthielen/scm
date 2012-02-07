@@ -15,14 +15,12 @@ namespace scm {
 Value* SEval(Value* val, EnvironmentFrame* env)               { return Eval(Eval(val, env), env); }
 void   Set(Symbol* sym, Value* val, EnvironmentFrame* env)    { env->Set(sym, Eval(val, env)); }
 
-Value* SEvalE(Value* val, Value* eenv, EnvironmentFrame* env)
-{
+Value* SEvalE(Value* val, Value* eenv, EnvironmentFrame* env) {
 	EnvironmentFrame* nenv = assert_type<EnvironmentFrame>(Eval(eenv, env));
 	return Eval(Eval(val, env), nenv);
 }
 
-void Define(Value* sv, ConsPair* rest, EnvironmentFrame* env)
-{
+void Define(Value* sv, ConsPair* rest, EnvironmentFrame* env) {
     if (Symbol* s = expr_cast<Symbol>(sv))
     {
 		if (rest == 0)
@@ -51,8 +49,7 @@ void Define(Value* sv, ConsPair* rest, EnvironmentFrame* env)
 
 Value* LEnv(EnvironmentFrame* env) { return env; }
 
-Value* LEnvSeq(EnvironmentFrame* env)
-{
+Value* LEnvSeq(EnvironmentFrame* env) {
     if (env == 0) return 0;
 
     typedef std::vector<Value*> RetV;
@@ -341,23 +338,10 @@ Value* GetArrayElem(Value* av, unsigned int n, EnvironmentFrame* env) { return a
 void   SetArrayElem(Value* av, unsigned int n, Value* v, EnvironmentFrame* env) { assert_type<ValArray>(Eval(av, env))->set(n, Eval(v, env)); }
 Value* ArraySize(Value* av, EnvironmentFrame* env)                              { return assert_type<ValArray>(Eval(av, env))->size(); }
 
-int tstcb(Value* f, EnvironmentFrame* e) {
-	typedef std::pair<int, std::string> P;
-	typedef std::vector< P > CT;
-	typedef std::map<std::string, double> CM;
-	CBFn2<int, CT, CM> cbf(e);
-	cbf.function(assert_type<Function>(Eval(f, e)));
-	
-	CT x; x.push_back(P(0, "foo")); x.push_back(P(1, "bar")); x.push_back(P(2, "baz"));
-	CM y; y["bim"] = 3; y["ben"] = 4; y["tweedle"] = 5;
-	return cbf.apply(x, y);
-}
-
 // base importer
 void InitBaseStdEnv(EnvironmentFrame* env)
 {
     Allocator* alloc = env->allocator();
-env->Define("tstcb", bindfn(alloc, &tstcb));
 
     // allocate standard environment functions
     env->Define("eval",             bindfn(alloc, &SEval));

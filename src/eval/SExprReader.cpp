@@ -35,7 +35,7 @@ class SExprReader : public SExprReaderMachine
 public:
     SExprReader(Allocator& a) : SExprReaderMachine(LookingForValue),
         in_escape(false), in_comment(false), in_quote(false), in_unquote(false), in_split(false),
-        in_delay(false), in_force(false), expect_end_list(false), allocator(a), output_value(0)
+        in_delay(false), in_force(false), in_lookup_lhs(false), in_lookup_rhs(false), expect_end_list(false), allocator(a), output_value(0)
     {
         AddStateHandler(LookingForValue, &SExprReader::LookForValue);
         AddStateHandler(ReadingString,   &SExprReader::ReadString);
@@ -46,22 +46,21 @@ public:
         AddTransitionHandler(AnyState,      EndOfStream, &SExprReader::ValidateState);
     }
 
-    Value* value() const
-    {
+    Value* value() const {
         return output_value;
     }
 private:
-    bool        in_escape, in_comment, in_quote, in_unquote, in_delay, in_force, in_split, expect_end_list;
+    bool        in_escape, in_comment, in_quote, in_unquote, in_delay, in_force, in_split, in_lookup_lhs, in_lookup_rhs, expect_end_list;
     Value*      output_value;
     Allocator&  allocator;
 
     struct NestedExpr
     {
-        NestedExpr(bool quote, bool split, bool delay, bool force, ConsPair* head, ConsPair* last) :
-            in_quote(quote), in_split(split), in_delay(delay), in_force(force),
+        NestedExpr(bool quote, bool split, bool delay, bool force, bool lookup_rhs, ConsPair* head, ConsPair* last) :
+            in_quote(quote), in_split(split), in_delay(delay), in_force(force), in_lookup_rhs(lookup_rhs),
             head_node(head), last_node(last) { }
 
-        bool in_quote, in_split, in_delay, in_force;
+        bool in_quote, in_split, in_delay, in_force, in_lookup_rhs;
         ConsPair *head_node, *last_node;
     };
 
@@ -69,12 +68,10 @@ private:
     NestedExprs nested_exprs;
 
     // state handlers
-    void LookForValue(const char& c)
-    {
+    void LookForValue(const char& c) {
         if (in_comment) { in_comment = (c != '\n' && c != '\r'); return; }
 
-        switch (c)
-        {
+        switch (c) {
         case '(':
             BeginList();
             break;
@@ -107,8 +104,7 @@ private:
             SetState(ReadingString);
             break;
         default:
-            if (!is_whitespace(c))
-            {
+            if (!is_whitespace(c)) {
                 PutBack(c);
                 SetState(ReadingAtom);
                 break;
@@ -116,40 +112,48 @@ private:
         }
     }
     
-    void ReadString(const char& c)
-    {
-        if (!in_escape)
-        {
+	void SetStateWithNSCheck(SExprReadState s) {
+		if (Peek(1) == ':') {
+			Read();
+			this->in_lookup_lhs = true;
+		}
+		SetState(s);
+	}
+
+    void ReadString(const char& c) {
+        if (!in_escape) {
             if (c == '\"')
-                SetState(LookingForValue);
+				SetStateWithNSCheck(LookingForValue);
             else if (c == '\\')
                 in_escape = true;
-        }
-        else
-        {
+        } else {
             in_escape = false;
         }
     }
     
-    void ReadAtom(const char& c)
-    {
-        bool is_new_tok = c == '(' || c == '\"' || c == ')';
+    void ReadAtom(const char& c) {
+        bool is_new_tok = c == '(' || c == '\"' || c == ')' || c == ':';
 
-        if (is_whitespace(c) || is_new_tok)
-        {
+        if (is_whitespace(c) || is_new_tok) {
             PutBack(c);
-            SetState(LookingForValue);
+			SetStateWithNSCheck(LookingForValue);
         }
     }
     
     // state transition handlers
-    void AddString(elem_iter begin, elem_iter end)
-    {
+    void AddString(elem_iter begin, elem_iter end) {
+		if (in_lookup_lhs) {
+			end = end - 1;
+		}
+
         AddToResult(allocator.allocate<String>(unescape(std::string(begin, end - 1))));
     }
     
-    void AddAtom(elem_iter begin, elem_iter end)
-    {
+    void AddAtom(elem_iter begin, elem_iter end) {
+		if (in_lookup_lhs) {
+			end = end - 1;
+		}
+
         std::string val(begin, end);
         
 		if (is_numeric(val))
@@ -160,24 +164,21 @@ private:
             AddToResult(alloc_symbol(&allocator, val));
     }
 
-    void ValidateState(elem_iter begin, elem_iter end)
-    {
+    void ValidateState(elem_iter begin, elem_iter end) {
         if (nested_exprs.size() > 0)
             throw std::runtime_error("Expected ')'.");
-    }    
+    }
 
     // parse tree construction procedures
-    void BeginList()
-    {
+    void BeginList() {
         bool apply_quote = !this->in_unquote && (this->in_quote || (nested_exprs.size() > 0 && nested_exprs.top().in_quote));
 
-        nested_exprs.push(NestedExpr(apply_quote, in_split, in_delay, in_force, 0, 0));
+        nested_exprs.push(NestedExpr(apply_quote, in_split, in_delay, in_force, in_lookup_rhs, 0, 0));
 
-        in_delay = in_force = in_quote = in_unquote = in_split = false;
+        in_delay = in_force = in_quote = in_unquote = in_split = in_lookup_rhs = false;
     }
     
-    void EndList()
-    {
+    void EndList() {
         this->expect_end_list = false;
 
         if (nested_exprs.size() == 0)
@@ -186,82 +187,87 @@ private:
         NestedExpr ne = nested_exprs.top();
         nested_exprs.pop();
         this->in_split = ne.in_split;
+		this->in_lookup_rhs = ne.in_lookup_rhs;
 
         Value* v = ne.head_node;
         if (ne.in_delay) v = Delay(v);
         if (ne.in_force) v = Force(v);
 
+		if (Peek(1) == ':') {
+			Read();
+			this->in_lookup_lhs = true;
+		}
+
         AddToResult(v);
     }
 
-    void AddToResult(Value* v)
-    {
+    void AddToResult(Value* v) {
         if (this->expect_end_list)
             throw std::runtime_error("Expected ')'.");
 
         // do we need to accumulate this value on a nested expression or not?
-        if (nested_exprs.size() == 0)
-        {
+        if (nested_exprs.size() == 0) {
             if (in_delay) v = Delay(v);
             if (in_force) v = Force(v);
             if (in_quote) v = Quote(v);
 
-            this->output_value = v;
-            Detach();
-        }
-        else
-        {
+			bool detach = !in_lookup_lhs;
+
+			if (in_lookup_rhs) {
+				this->output_value = Lookup(this->output_value, v);
+			} else {
+				this->output_value = v;
+			}
+
+			if (detach) {
+				Detach();
+			}
+        } else {
             NestedExpr& ne       = nested_exprs.top();
             ConsPair*   cur_pair = 0;
+			Value*      last_val = ne.last_node == 0 ? 0 : ne.last_node->head();
 
-            if (ne.head_node != 0 && this->in_split)
-            {
+            if (ne.head_node != 0 && this->in_split) {
                 cur_pair = ne.last_node;
-            }
-            else if (ne.head_node != 0)
-            {
+			} else if (in_lookup_rhs) {
+				cur_pair = ne.last_node;
+            } else if (ne.head_node != 0) {
                 cur_pair = allocator.allocate<ConsPair>((Value*)0, (Value*)0);
                 ne.last_node->tail(cur_pair);
                 ne.last_node = cur_pair;
-            }
-            else if (ne.in_quote)
-            {
+            } else if (ne.in_quote) {
                 // this is a quoted list: "quote" it as (list ...)
                 cur_pair         = allocator.allocate<ConsPair>((Value*)0, (Value*)0);
                 ConsPair* lcall  = allocator.allocate<ConsPair>(alloc_symbol(&allocator, "list"), cur_pair);
                 ne.head_node  = lcall;
                 ne.last_node = cur_pair;
-            }
-            else
-            {
+            } else {
                 cur_pair     = allocator.allocate<ConsPair>((Value*)0, (Value*)0);
                 ne.head_node = cur_pair;
                 ne.last_node = cur_pair;
             }
 
             // quote/delay/force this list member if necessary
-            bool   apply_quote = (!in_unquote && (ne.in_quote || in_quote)) && (expr_cast<ConsPair>(v) == 0);
+            bool apply_quote = (!in_unquote && (ne.in_quote || in_quote)) && (expr_cast<ConsPair>(v) == 0);
 
-            if (apply_quote) v = Quote(v);
-            if (in_delay)    v = Delay(v);
-            if (in_force)    v = Force(v);
+            if (apply_quote)   v = Quote(v);
+            if (in_delay)      v = Delay(v);
+            if (in_force)      v = Force(v);
+			if (in_lookup_rhs) v = Lookup(last_val, v);
 
-            if (this->in_split && ne.in_quote)
-            {
+            if (this->in_split && ne.in_quote) {
                 ConsPair* daarg2 = allocator.allocate<ConsPair>(v, (Value*)0);
                 ConsPair* daarg1 = allocator.allocate<ConsPair>(ne.head_node, daarg2);
                 ConsPair* dacall = allocator.allocate<ConsPair>(alloc_symbol(&allocator, "dappend"), daarg1);
                 ne.head_node = dacall;
-            }
-            else if (this->in_split)
-            {
+            } else if (this->in_split) {
                 cur_pair->tail(v);
-            }
-            else
-            {
+            } else {
                 cur_pair->head(v);
             }
         }
+
+		in_lookup_rhs   = in_lookup_lhs;
 
         in_delay        = false;
         in_force        = false;
@@ -269,18 +275,17 @@ private:
         in_unquote      = false;
         expect_end_list = in_split;
         in_split        = false;
+		in_lookup_lhs   = false;
     }
 
-    Value* Quote(Value* v)
-    {
+    Value* Quote(Value* v) {
         Value* qarg = allocator.allocate<ConsPair>(v, (Value*)0);
         Value* qfnc = allocator.allocate<ConsPair>(alloc_symbol(&allocator, "quote"), qarg);
 
         return qfnc;
     }
 
-    Value* Delay(Value* v)
-    {
+    Value* Delay(Value* v) {
         return
             allocator.allocate<ConsPair>
             (
@@ -297,10 +302,26 @@ private:
             );
     }
 
-    Value* Force(Value* v)
-    {
+    Value* Force(Value* v) {
         return allocator.allocate<ConsPair>(v, (Value*)0);
     }
+
+	Value* Lookup(Value* lhs, Value* rhs) {
+		return
+			allocator.allocate<ConsPair>
+			(
+				alloc_symbol(&allocator, "eval/env"),
+				allocator.allocate<ConsPair>
+				(
+					rhs,
+					allocator.allocate<ConsPair>
+					(
+						lhs,
+						(Value*)0
+					)
+				)
+			);
+	}
 };
 
 Value* ReadSExpression(std::istream& input, Allocator& allocator)
