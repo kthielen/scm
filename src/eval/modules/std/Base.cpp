@@ -17,7 +17,7 @@ void   Set(Symbol* sym, Value* val, EnvironmentFrame* env)    { env->Set(sym, Ev
 
 Value* SEvalE(Value* val, Value* eenv, EnvironmentFrame* env) {
 	EnvironmentFrame* nenv = assert_type<EnvironmentFrame>(Eval(eenv, env));
-	return Eval(Eval(val, env), nenv);
+	return Eval(val, nenv);
 }
 
 void Define(Value* sv, ConsPair* rest, EnvironmentFrame* env) {

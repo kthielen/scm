@@ -78,8 +78,7 @@ template <>
     };
 
 template <typename T>
-    T* assert_type(Value* v)
-    {
+    T* assert_type(Value* v) {
         T* r = expr_cast<T>(v);
 
         if (r == 0 && (v != 0 || !TypeTraits<T>::allow_null))
@@ -90,8 +89,7 @@ template <typename T>
 
 // a strict assert_type that requires non-nil values for lists
 template <typename T>
-    T* assert_non_nil_type(Value* v)
-    {
+    T* assert_non_nil_type(Value* v) {
         T* r = expr_cast<T>(v);
 
         if (r == 0)
@@ -101,8 +99,7 @@ template <typename T>
     }
 
 template <int N>
-    void assert_length(ConsPair* p)
-    {
+    void assert_length(ConsPair* p) {
         if (N > 0 && Length(p) != N)
             throw std::runtime_error("Expected " + str::to_string(N) + " arguments but received " + str::to_string(Length(p)) + ".");
     }

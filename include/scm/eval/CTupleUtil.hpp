@@ -1,11 +1,12 @@
 
 
-#ifndef EVAL_CTUPLEUTIL_H_INCLUDED
-#define EVAL_CTUPLEUTIL_H_INCLUDED
+#ifndef SCM_CTUPLEUTIL_H_INCLUDED
+#define SCM_CTUPLEUTIL_H_INCLUDED
 
 #include <scm/eval/CTypeUtil.hpp>
 
-namespace scm {
+namespace scm
+{
 
     template < typename A0 >
 	    struct tuple1
@@ -26,6 +27,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + ")";
 			}
 		};
 	
@@ -68,6 +73,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + CToLisp< A1 >::desc() + ")";
 			}
 		};
 	
@@ -113,6 +122,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + CToLisp< A1 >::desc() + CToLisp< A2 >::desc() + ")";
 			}
 		};
 	
@@ -161,6 +174,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + CToLisp< A1 >::desc() + CToLisp< A2 >::desc() + CToLisp< A3 >::desc() + ")";
 			}
 		};
 	
@@ -212,6 +229,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + CToLisp< A1 >::desc() + CToLisp< A2 >::desc() + CToLisp< A3 >::desc() + CToLisp< A4 >::desc() + ")";
 			}
 		};
 	
@@ -266,6 +287,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + CToLisp< A1 >::desc() + CToLisp< A2 >::desc() + CToLisp< A3 >::desc() + CToLisp< A4 >::desc() + CToLisp< A5 >::desc() + ")";
 			}
 		};
 	
@@ -323,6 +348,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + CToLisp< A1 >::desc() + CToLisp< A2 >::desc() + CToLisp< A3 >::desc() + CToLisp< A4 >::desc() + CToLisp< A5 >::desc() + CToLisp< A6 >::desc() + ")";
 			}
 		};
 	
@@ -383,6 +412,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + CToLisp< A1 >::desc() + CToLisp< A2 >::desc() + CToLisp< A3 >::desc() + CToLisp< A4 >::desc() + CToLisp< A5 >::desc() + CToLisp< A6 >::desc() + CToLisp< A7 >::desc() + ")";
 			}
 		};
 	
@@ -446,6 +479,10 @@ namespace scm {
 				r = a->allocate<ConsPair>(CToLisp< A0 >::alloc(a, v.v0), r);
 
 				return r;
+			}
+
+			static std::string desc() {
+				return "(" + CToLisp< A0 >::desc() + CToLisp< A1 >::desc() + CToLisp< A2 >::desc() + CToLisp< A3 >::desc() + CToLisp< A4 >::desc() + CToLisp< A5 >::desc() + CToLisp< A6 >::desc() + CToLisp< A7 >::desc() + CToLisp< A8 >::desc() + ")";
 			}
 		};
 	

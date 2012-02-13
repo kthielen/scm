@@ -28,7 +28,7 @@ endif
 CPPFLAGS := -pthread $(INCDIRS:%=-I%) $(OPTARG) $(PROFARG) -m64 -Wall -Wno-deprecated
 
 scm: depend $(OBJECTS)
-	ar -r build/lib/libscm.a $(OBJECTS)
+	$(CC) -shared $(CPPFLAGS) $(OBJECTS) -o build/lib/libscm.so
 
 build/obj/%.o:%.cpp
 	$(CC) $(CPPFLAGS) -c $< -o $@
@@ -59,5 +59,5 @@ clean:
 	echo "" > build/dep/Makefile.dep
 
 install: scm
-	ln -sf $(PWD)/build/lib/libscm.a /usr/lib/libscm.a
+	ln -sf $(PWD)/build/lib/libscm.so /usr/lib/libscm.so
 	ln -sf $(PWD)/include/scm /usr/include/scm

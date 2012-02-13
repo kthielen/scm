@@ -4,6 +4,7 @@
 #include <scm/eval/Allocator.hpp>
 #include <scm/eval/Util.hpp>
 #include <scm/eval/SExprReader.hpp>
+#include <scm/str/Util.hpp>
 //#include <boost/date_time/posix_time/posix_time.hpp>
 #include <iostream>
 #include <sstream>
@@ -35,6 +36,10 @@ template <typename T> struct CToLisp {
 	static void argSet(ConsPair* an, const T& v) {
 		((Box<T>*)(an->head()))->value(v);
 	}
+
+	static std::string desc() {
+		return str::raw_type_name<T>();
+	}
 };
 
 // when defaulting to boxes, accept either "raw pointers" or boxes
@@ -59,6 +64,14 @@ template <typename T> struct LispToC {
     }
 };
 
+// 'void' is the unit type, actually
+template <>
+	struct CToLisp<void> {
+		static std::string desc() {
+			return "()";
+		}
+	};
+
 // the default binding method for pointers is to use boxed auto_ptrs
 template <typename T> struct CToLisp<T*> {
 	typedef Box< ptr<T> > BoxType;
@@ -66,6 +79,10 @@ template <typename T> struct CToLisp<T*> {
 
 	static void argSet(ConsPair* an, T* v) {
 		((Box< ptr<T> >*)(an->head()))->value(ptr<T>(v));
+	}
+
+	static std::string desc() {
+		return str::raw_type_name<T>() + "*";
 	}
 };
 
@@ -85,6 +102,10 @@ template <typename T> struct CToLisp< gcguard<T> > {
 	static Value* alloc(Allocator* a, const gcguard<T>& v) { return v.ptr(); }
 
 	DEFAULT_ARG_SET_DELAY(const gcguard<T>&);
+
+	static std::string desc() {
+		return str::raw_type_name<T>();
+	}
 };
 
 template <typename T> struct ArgContrib { static const int V = 1; };
@@ -107,6 +128,9 @@ template <typename T> struct ArgContrib<T&> : public ArgContrib<T> { };
         static void argSet(ConsPair* an, T v) { \
             ((Number*)(an->head()))->update(v); \
         } \
+		static std::string desc() { \
+			return #T; \
+		} \
 	}; \
     template <> struct LispToC< T > { \
         static T unbox(Value* v) {  return (T)(assert_type<Number>(v)->value());  } \
@@ -136,6 +160,10 @@ template <> struct CToLisp<std::string> {
 	static void argSet(ConsPair* an, const std::string& v) {
 		((String*)(an->head()))->update(v);
 	}
+
+	static std::string desc() {
+		return "string";
+	}
 };
 template <> struct LispToC<std::string> {
     static std::string unbox(Value* v) { return assert_type<String>(v)->value(); }
@@ -152,6 +180,10 @@ template <> struct CToLisp<const char*> {
 	static void argSet(ConsPair* an, const char* v) {
 		((String*)(an->head()))->update(std::string(v ? v : ""));
 	}
+
+	static std::string desc() {
+		return "string";
+	}
 };
 template <> struct LispToC<const char*> {
     static const char* unbox(Value* v) { return assert_type<String>(v)->value().c_str(); }
@@ -167,6 +199,10 @@ template <> struct CToLisp<char*> {
 
 	static void argSet(ConsPair* an, char* v) {
 		((String*)(an->head()))->update(std::string(v ? v : ""));
+	}
+
+	static std::string desc() {
+		return "string";
 	}
 };
 template <> struct LispToC<char*> {
@@ -188,6 +224,10 @@ template <> struct CToLisp<bool> {
 			an->head(0);
 		}
 	}
+
+	static std::string desc() {
+		return "bool";
+	}
 };
 template <> struct LispToC<bool> {
     static bool unbox(Value* v) { return v != 0; }
@@ -201,6 +241,9 @@ template <> struct CToLisp<std::istream*> {
 	typedef IStream BoxType;
 	static Value* alloc(Allocator* a, std::istream* v) { return a->allocate<IStream>(v, true); }
 	DEFAULT_ARG_SET(std::istream*);
+	static std::string desc() {
+		return "istream";
+	}
 };
 template <> struct LispToC<std::istream*> {
     static std::istream* unbox(Value* v) {
@@ -226,6 +269,9 @@ template <> struct CToLisp<std::ostream*> {
 	typedef OStream BoxType;
 	static Value* alloc(Allocator* a, std::ostream* v) { return a->allocate<OStream>(v, true); }
 	DEFAULT_ARG_SET(std::ostream*);
+	static std::string desc() {
+		return "ostream";
+	}
 };
 template <> struct LispToC<std::ostream*> {
     static std::ostream* unbox(Value* v) {
@@ -244,6 +290,9 @@ template <> struct CToLisp<std::iostream*> {
 	typedef IOStream BoxType;
 	static Value* alloc(Allocator* a, std::iostream* v) { return a->allocate<IOStream>(v, true); }
 	DEFAULT_ARG_SET(std::iostream*);
+	static std::string desc() {
+		return "iostream";
+	}
 };
 template <> struct LispToC<std::iostream*> {
     static std::iostream* unbox(Value* v) { return assert_type<IOStream>(v)->value(); }
@@ -265,6 +314,10 @@ template <typename U, typename V> struct CToLisp< std::pair<U, V> > {
 
 	typedef std::pair<U, V> XPair;
 	DEFAULT_ARG_SET_DELAY(const XPair&);
+
+	static std::string desc() {
+		return "(" + CToLisp<U>::desc() + ", " + CToLisp<V>::desc() + ")";
+	}
 };
 template <typename U, typename V> struct LispToC< std::pair<U, V> > {
     static std::pair<U, V> unbox(Value* v) {
@@ -285,6 +338,9 @@ template <typename K, typename V> struct CToLisp< std::map<K, V> > {
 	static ConsPair* alloc(Allocator* a, const std::map<K, V>& v) { return LiftContainer(v, a); }
 	typedef std::map<K, V> XMap;
 	DEFAULT_ARG_SET_DELAY(const XMap&);
+	static std::string desc() {
+		return "{" + CToLisp<K>::desc() + " => " + CToLisp<V>::desc() + "}";
+	}
 };
 
 #ifndef WIN32
@@ -292,6 +348,9 @@ template <typename K, typename V> struct CToLisp< stdext::hash_map<K, V> > {
 	static ConsPair* alloc(Allocator* a, const stdext::hash_map<K, V>& v) { return LiftContainer(v, a); }
 	typedef stdext::hash_map<K, V> XMap;
 	DEFAULT_ARG_SET_DELAY(const XMap&);
+	static std::string desc() {
+		return "{" + CToLisp<K>::desc() + " =#=> " + CToLisp<V>::desc() + "}";
+	}
 };
 #endif
 
@@ -299,6 +358,9 @@ template <typename T> struct CToLisp< std::list<T> > {
 	typedef ConsPair BoxType;
     static ConsPair* alloc(Allocator* a, const std::list<T>& v) { return LiftContainer(v, a); }
 	DEFAULT_ARG_SET_DELAY(const std::list<T>&);
+	static std::string desc() {
+		return "[:" + CToLisp<T>::desc() + ":]";
+	}
 };
 template <typename T> struct LispToC< std::list<T> > {
 	typedef gcguard<ConsPair> PrimT;
@@ -326,6 +388,9 @@ template <typename T> struct CToLisp< std::vector<T> > {
 	typedef ConsPair BoxType;
     static ConsPair* alloc(Allocator* a, const std::vector<T>& v) { return LiftContainer(v, a); }
 	DEFAULT_ARG_SET_DELAY(const std::vector<T>&);
+	static std::string desc() {
+		return "[" + CToLisp<T>::desc() + "]";
+	}
 };
 template <typename T> struct LispToC< std::vector<T> > {
 	typedef gcguard<ConsPair> PrimT;
@@ -360,6 +425,7 @@ template <> struct CToLisp<Symbol*> {
 	typedef Symbol* BoxType;
 	static Value* alloc(Allocator* a, Symbol* v) { return v; }
 	DEFAULT_ARG_SET(Symbol*);
+	static std::string desc() { return "symbol"; }
 };
 template <> struct LispToC<Symbol*> {
     static Symbol* unbox(Value* v) { return assert_type<Symbol>(v); }
@@ -372,6 +438,7 @@ template <> struct CToLisp<Value*> {
 	typedef Value* BoxType;
 	static Value* alloc(Allocator* a, Value* v) { return v; }
 	DEFAULT_ARG_SET_DELAY(Value*);
+	static std::string desc() { return "value"; }
 };
 template <> struct LispToC<Value*> {
     static Value* unbox(Value* v) { return v; }
@@ -385,6 +452,7 @@ template <> struct CToLisp<EnvironmentFrame*> {
 	typedef EnvironmentFrame* BoxType;
 	static Value* alloc(Allocator* a, EnvironmentFrame* v) { return v; }
 	DEFAULT_ARG_SET(EnvironmentFrame*);
+	static std::string desc() { return ""; }
 };
 template <> struct LispToC<EnvironmentFrame*> {
     static EnvironmentFrame* unbox(Value* v) { return assert_type<EnvironmentFrame>(v); }
@@ -399,6 +467,7 @@ template <> struct CToLisp<ConsPair*> {
 	typedef ConsPair* BoxType;
 	static Value* alloc(Allocator* a, ConsPair* v) { return v; }
 	DEFAULT_ARG_SET_DELAY(ConsPair*);
+	static std::string desc() { return "cons"; }
 };
 template <> struct LispToC<ConsPair*> {
     static ConsPair* unbox(Value* v) { return assert_type<ConsPair>(v); }
@@ -411,6 +480,7 @@ template <> struct ArgContrib<ConsPair*> { static const int V = -1000; };
 
 template <> struct CToLisp<Allocator*> {
 	typedef Allocator* BoxType;
+	static std::string desc() { return ""; }
 };
 template <> struct LispToC<Allocator*> {
 	typedef Allocator* PrimT;

@@ -60,6 +60,15 @@ void DLLoadEnv(const std::string& fname, Value* eframe, EnvironmentFrame* env) {
     DLLoad(fname, e.ptr());
 }
 
+void DLImport(Value* msym, EnvironmentFrame* env) {
+	Symbol*           smsym = assert_type<Symbol>(msym);
+	Allocator*        alloc = smsym->allocator();
+	EnvironmentFrame* menv  = alloc->allocate<EnvironmentFrame>((EnvironmentFrame*)0);
+
+	DLLoad("lib" + smsym->value() + ".so", menv);
+	env->Define(smsym->value(), menv);
+}
+
 void InitSystemStdEnv(EnvironmentFrame* env) {
     Allocator* alloc = env->allocator();
 
@@ -68,6 +77,7 @@ void InitSystemStdEnv(EnvironmentFrame* env) {
     env->Define("env-var",  bindfn(alloc, &LEnv));
     env->Define("load",     bindfn(alloc, &DLLoad));
     env->Define("load/env", bindfn(alloc, &DLLoadEnv));
+	env->Define("import",   bindfn(alloc, &DLImport));
 
     env->Define("pid", bindfn(alloc, &getpid));
     env->Define("ssystem", bindfn(alloc, &SSystem));
