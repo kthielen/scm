@@ -62,6 +62,14 @@ Value* LEnvSeq(EnvironmentFrame* env) {
     return env->allocator()->allocate<ConsPair>(LiftContainer(result, env->allocator()), LEnv(env->Parent()));;
 }
 
+void LEnvJoin(Value* e, EnvironmentFrame* env) {
+	EnvironmentFrame* fe = assert_type<EnvironmentFrame>(Eval(e, env));
+    const EnvironmentFrame::VarFrame& evf = fe->value();
+    for (EnvironmentFrame::VarFrame::const_iterator evfi = evf.begin(); evfi != evf.end(); ++evfi) {
+		env->Define(evfi->first, evfi->second);
+	}
+}
+
 double LPtrV(Value* v, EnvironmentFrame* env) {
 	return (long long)(Eval(v, env));	
 }
@@ -349,6 +357,7 @@ void InitBaseStdEnv(EnvironmentFrame* env)
     env->Define("define",           bindfn(alloc, &Define));
     env->Define("set",              bindfn(alloc, &Set));
     env->Define("environment",      bindfn(alloc, &LEnv));
+	env->Define("use",              bindfn(alloc, &LEnvJoin));
     env->Define("open-environment", bindfn(alloc, &LEnvSeq));
 	env->Define("ptr",              bindfn(alloc, &LPtrV));
 

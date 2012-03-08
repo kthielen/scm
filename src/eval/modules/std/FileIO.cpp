@@ -11,6 +11,7 @@
 #include <vector>
 #include <fstream>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 using namespace str;
 
@@ -276,17 +277,15 @@ void InitRAFileIO(EnvironmentFrame* env)
 
 void Import(std::istream* input, EnvironmentFrame* env) { while (*input) Eval(ReadSExpression(*input, *(env->allocator())), env); }
 
-void Include(const std::string& fname, EnvironmentFrame* env)
-{
+void Include(const std::string& fname, EnvironmentFrame* env) {
+	// have we already included this file?  If so, don't try to include it again
     const Symbol* mlvs = alloc_symbol(env->allocator(), "#included-files");
     
     ConsPair* mods  = env->HasImmediateValue(mlvs) ? expr_cast<ConsPair>(env->Lookup(mlvs)) : 0;
     ConsPair* omods = mods;
 
-    while (mods != 0)
-    {
-        if (String* s = expr_cast<String>(mods->head()))
-        {
+    while (mods != 0) {
+        if (String* s = expr_cast<String>(mods->head())) {
             if (s->value() == fname)
                 return;
         }
@@ -302,10 +301,11 @@ void Include(const std::string& fname, EnvironmentFrame* env)
     Value*        spath = env->allocator()->allocate<String>(sp);
     const Symbol* spsym = alloc_symbol(env->allocator(), "script-path");
 
-    if (env->HasImmediateValue(spsym))
+    if (env->HasImmediateValue(spsym)) {
         env->Set(spsym, spath);
-    else
+	} else {
         env->Define(spsym, spath);
+	}
 
     // if we get here, it's OK to include the file
     // if the file doesn't exist on the filesystem, but there's an active package, try to extract it from the package
@@ -317,22 +317,38 @@ void Include(const std::string& fname, EnvironmentFrame* env)
         throw std::runtime_error("Unable to open the file '" + fname + "' for reading.");
     }
 
-    string_pair p = rsplit<char>(fname, ".");
+	// for this file's scope, change the current directory to the file's directory
+	int cwd = open(".", O_RDONLY);
 
-    if (p.second == "ssp") {
-		stream::script_substitutions<char> subs;
-		subs.pass_through_prefix = "(sprint \"";
-		subs.pass_through_suffix = "\")";
-		subs.inline_code_prefix  = "(sprint ";
-		subs.inline_code_suffix  = ")";
+	string_pair fdir = rsplit<char>(fname, "/");
+	if (!fdir.first.empty()) {
+		chdir(fdir.first.c_str());
+	}
 
-		stream::embedded_script_stream<char> ess(fs, subs);
-		Import(&ess, env);
-//    } else if (p.second == "spkg") {
-//        EvalPackage(fname, env);
-    } else {
-		Import(&fs, env);
-    }
+	try {
+		// now evaluate the contents of the file
+	    string_pair p = rsplit<char>(fname, ".");
+	
+	    if (p.second == "ssp") {
+			stream::script_substitutions<char> subs;
+			subs.pass_through_prefix = "(sprint \"";
+			subs.pass_through_suffix = "\")";
+			subs.inline_code_prefix  = "(sprint ";
+			subs.inline_code_suffix  = ")";
+	
+			stream::embedded_script_stream<char> ess(fs, subs);
+			Import(&ess, env);
+	    } else {
+			Import(&fs, env);
+	    }
+
+		// restore the old working directory
+		if (cwd >= 0) { fchdir(cwd); close(cwd); }
+	} catch (...) {
+		// restore the old working directory
+		if (cwd >= 0) { fchdir(cwd); close(cwd); }
+		throw;
+	}
 }
 
 std::istream* LOpenFile(std::string file_name)
