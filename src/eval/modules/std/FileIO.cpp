@@ -3,6 +3,7 @@
 #include <scm/eval/SExprReader.hpp>
 #include <scm/eval/Util.hpp>
 #include <scm/eval/CTypeUtil.hpp>
+#include <scm/eval/modules/std/System.hpp>
 
 #include <scm/parse/StreamFSM.hpp>
 #include <scm/stream/embedded_script_stream.hpp>
@@ -293,13 +294,9 @@ void Include(const std::string& fname, EnvironmentFrame* env) {
         mods = expr_cast<ConsPair>(mods->tail());
     }
 
-    // let the script know its path
-    std::string     sp    = str::rsplit<char>(fname, "/").first;
-    if (sp.empty()) sp = ".";
-    sp += "/";
-
-    Value*        spath = env->allocator()->allocate<String>(sp);
-    const Symbol* spsym = alloc_symbol(env->allocator(), "script-path");
+    // let the script know the path it was called from
+    Value*        spath = env->allocator()->allocate<String>(getPWD());
+    const Symbol* spsym = alloc_symbol(env->allocator(), "run-path");
 
     if (env->HasImmediateValue(spsym)) {
         env->Set(spsym, spath);

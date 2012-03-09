@@ -7,6 +7,8 @@ namespace scm {
 
 void InitSystemStdEnv(EnvironmentFrame* env);
 
+std::string getPWD();
+
 }
 
 #endif

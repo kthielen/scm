@@ -1,6 +1,7 @@
 #include <scm/eval/Data.hpp>
 #include <scm/eval/Util.hpp>
 #include <scm/eval/CFuncBind.hpp>
+#include <scm/eval/modules/std/FileIO.hpp>
 #include <scm/str/Util.hpp>
 
 #include <unistd.h>
@@ -8,6 +9,7 @@
 #include <fstream>
 
 #include <list>
+#include <stack>
 
 namespace scm {
 
@@ -64,6 +66,17 @@ void DLLoadEnv(const std::string& fname, Value* eframe, EnvironmentFrame* env) {
     DLLoad(fname, e.ptr());
 }
 
+bool importScriptFile(const std::string& fname, EnvironmentFrame* env) {
+	std::ifstream f(fname.c_str());
+	if (!f.is_open()) {
+		return false;
+	} else {
+		f.close();
+		Include(fname, env);
+		return true;
+	}
+}
+
 void ModuleImportAs(std::string mpath, const std::string& mname, EnvironmentFrame* env) {
 	Allocator*      a    = env->allocator();
 	gcguard<Symbol> msym = alloc_symbol(a, mname);
@@ -81,14 +94,10 @@ void ModuleImportAs(std::string mpath, const std::string& mname, EnvironmentFram
 	// allocate a fresh environment and import definitions from <name> into it by one of the following methods:
 	//  * evaluate the script in <name>/init.scm
 	//  * load lib<name>.so
-	std::ifstream mfile((mpath + "/init.scm").c_str());
-	if (mfile.is_open()) {
-		while (mfile) {
-			Eval(ReadSExpression(mfile, *a), menv.ptr());
+	if (!importScriptFile(mpath + "/init.scm", menv.ptr())) {
+		if (!importScriptFile(LEnv("SCM_MODULE_BASE") + "/" + mpath + "/init.scm", menv.ptr())) {
+			throw std::runtime_error("Unable to find module '" + mpath + "' to load.");
 		}
-	} else {
-		str::string_pair p = str::rsplit<char>(mpath, "/");
-		DLLoad(p.first + "/lib" + p.second + ".so", menv.ptr());
 	}
 
 	env->Define(msym.ptr(), menv.ptr());
@@ -110,6 +119,21 @@ std::string getPWD() {
 	return std::string(pwd);
 }
 
+typedef std::stack<std::string> Dirs;
+Dirs prevDirs;
+
+void pushD(const std::string& dir) {
+	prevDirs.push(getPWD());
+	chdir(dir.c_str());
+}
+
+void popD() {
+	if (!prevDirs.empty()) {
+		chdir(prevDirs.top().c_str());
+		prevDirs.pop();
+	}
+}
+
 void InitSystemStdEnv(EnvironmentFrame* env) {
     Allocator* alloc = env->allocator();
 
@@ -124,6 +148,8 @@ void InitSystemStdEnv(EnvironmentFrame* env) {
     env->Define("pid",     bindfn(alloc, &getpid));
 	env->Define("pwd",     bindfn(alloc, &getPWD));
     env->Define("ssystem", bindfn(alloc, &SSystem));
+	env->Define("pushd",   bindfn(alloc, &pushD));
+	env->Define("popd",    bindfn(alloc, &popD));
 }
 
 }
