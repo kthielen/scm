@@ -415,8 +415,7 @@ void EnvironmentFrame::Define(const std::string& sym, Value* v)     { Define(all
 void EnvironmentFrame::Set(const std::string& sym, Value* v)        { Set(alloc_symbol(this->allocator(), sym), v); }
 Value* EnvironmentFrame::Lookup(const std::string& sym) const       { return Lookup(alloc_symbol(this->allocator(), sym)); }
 
-void EnvironmentFrame::Define(const Symbol* sym, Value* v)
-{
+void EnvironmentFrame::Define(const Symbol* sym, Value* v) {
     VarFrame::const_iterator vfi = find(sym);
     if (vfi != this->frame.end())
         throw std::runtime_error("The variable '" + PrintExpression(sym) + "' is already defined in this context.");
@@ -424,8 +423,7 @@ void EnvironmentFrame::Define(const Symbol* sym, Value* v)
     this->frame.push_back(std::pair<Symbol*, Value*>(const_cast<Symbol*>(sym), v));
 }
 
-void EnvironmentFrame::Set(const Symbol* sym, Value* v)
-{
+void EnvironmentFrame::Set(const Symbol* sym, Value* v) {
     VarFrame::iterator vfi = find(sym);
     
     if (vfi != this->frame.end())
@@ -436,8 +434,7 @@ void EnvironmentFrame::Set(const Symbol* sym, Value* v)
         throw std::runtime_error("The variable '" + PrintExpression(sym) + "' is not defined in this context, and can't be updated.");
 }
 
-Value* EnvironmentFrame::Lookup(const Symbol* sym) const
-{
+Value* EnvironmentFrame::Lookup(const Symbol* sym) const {
     VarFrame::const_iterator vfi = find(sym);
 
     if (vfi != this->frame.end())
@@ -448,39 +445,37 @@ Value* EnvironmentFrame::Lookup(const Symbol* sym) const
         throw std::runtime_error("The variable '" + PrintExpression(sym) + "' is not defined.");
 }
 
-EnvironmentFrame* EnvironmentFrame::Parent() const
-{
+EnvironmentFrame* EnvironmentFrame::Parent() const {
     return this->parent;
 }
 
-void EnvironmentFrame::format(std::ostream& out) const
-{
-    out << "{";
+void EnvironmentFrame::format(std::ostream& out) const {
+	typedef std::vector<std::string> Strs;
+	Strs names, values;
+	int maxnamelen = 0;
 
-    for (VarFrame::const_iterator vfi = this->frame.begin(); vfi != this->frame.end(); ++vfi)
-    {
-        if (vfi != this->frame.begin()) out << ", ";
+	for (VarFrame::const_iterator vfi = this->frame.begin(); vfi != this->frame.end(); ++vfi) {
+		std::string n = vfi->first->value();
 
-	PrintExpression(vfi->first, out);
-        out << " = ";
-        PrintExpression(vfi->second, out);
-    }
+		if (n.size() > 0 && n[0] != '#') {
+			names.push_back(n);
+			values.push_back(PrintExpression(vfi->second));
+			maxnamelen = std::max<int>(maxnamelen, n.size());
+		}
+	}
 
-    out << "}:";
-
-    if (this->parent == 0)
-        out << "()";
-    else
-        this->parent->format(out);
+	for (int i = 0; i < names.size(); ++i) {
+		if (i > 0) out << std::endl;
+		out << names[i] << std::string(maxnamelen - names[i].size(), ' ') << " : " << values[i];
+	}
+	out << std::flush;
 }
 
-bool EnvironmentFrame::HasImmediateValue(const Symbol* sym) const
-{
+bool EnvironmentFrame::HasImmediateValue(const Symbol* sym) const {
     return find(sym) != this->frame.end();
 }
 
-Value* EnvironmentFrame::LookupImmediateValue(const Symbol* sym) const
-{
+Value* EnvironmentFrame::LookupImmediateValue(const Symbol* sym) const {
     VarFrame::const_iterator vfi = find(sym);
 
     if (vfi == this->frame.end())
@@ -489,13 +484,11 @@ Value* EnvironmentFrame::LookupImmediateValue(const Symbol* sym) const
         return vfi->second;
 }
 
-const EnvironmentFrame::VarFrame& EnvironmentFrame::value() const
-{
+const EnvironmentFrame::VarFrame& EnvironmentFrame::value() const {
     return this->frame;
 }
 
-EnvironmentFrame::VarFrame::iterator EnvironmentFrame::find(const Symbol* sym)
-{
+EnvironmentFrame::VarFrame::iterator EnvironmentFrame::find(const Symbol* sym) {
     for (VarFrame::iterator vfi = this->frame.begin(); vfi != this->frame.end(); ++vfi)
 	if (vfi->first == sym)
 	    return vfi;
@@ -503,8 +496,7 @@ EnvironmentFrame::VarFrame::iterator EnvironmentFrame::find(const Symbol* sym)
     return this->frame.end();
 }
 
-EnvironmentFrame::VarFrame::const_iterator EnvironmentFrame::find(const Symbol* sym) const
-{
+EnvironmentFrame::VarFrame::const_iterator EnvironmentFrame::find(const Symbol* sym) const {
     for (VarFrame::const_iterator vfi = this->frame.begin(); vfi != this->frame.end(); ++vfi)
 	if (vfi->first == sym)
 	    return vfi;
@@ -512,13 +504,11 @@ EnvironmentFrame::VarFrame::const_iterator EnvironmentFrame::find(const Symbol* 
     return this->frame.end();
 }
 
-void EnvironmentFrame::Clear()
-{
+void EnvironmentFrame::Clear() {
     this->frame.clear();
 }
 
-void EnvironmentFrame::references(AllocVisitor& v)
-{
+void EnvironmentFrame::references(AllocVisitor& v) {
     v.visit((AllocBase*&)parent);
 
     for (VarFrame::iterator vfi = this->frame.begin(); vfi != this->frame.end(); ++vfi)
