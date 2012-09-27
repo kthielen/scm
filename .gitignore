@@ -1,4 +1,2 @@
 # ignore build artifacts
 build/
-
-include/scm/scm
